@@ -1,0 +1,55 @@
+version: "3.1"
+services:
+
+  traefik:
+    image: "traefik:v2.10.4"
+    container_name: "traefik"
+    ports:
+      - 80:80
+      - 443:443
+      - 8080:8080
+    volumes:
+      - ./config:/etc/traefik
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik-nt
+
+  nodered:
+    image: "nodered/node-red"
+    container_name: "nodered"
+    networks:
+      - traefik-nt
+    environment:
+      - SERVICE_NAME=nodered
+    volumes:
+      - ${PWD}/node-red/modules:/root/.node-red
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.nodered.entrypoints=web
+      - traefik.http.routers.nodered.rule=Host(`nodered.bysaama.lan`)
+      - traefik.http.services.nodered.loadbalancer.server.port=80
+      #- traefik.http.routers.nodered.tls=true
+      - traefik.http.routers.nodered.tls.certresolver=production
+    ports:
+      - 1880:1880
+
+  mosquitto:
+    image: "eclipse-mosquitto"
+    hostname: "mosquitto"
+    container_name: "mosquitto"
+    expose:
+      - "1883"
+      - "9001"
+    depends_on:
+      - nodered
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - traefik-nt
+
+networks:
+  traefik-nt:
+    external: true
